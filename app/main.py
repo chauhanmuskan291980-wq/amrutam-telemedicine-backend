@@ -3,6 +3,10 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.routes import admin, auth, consultations, doctors, payments
 from app.core.database import Base, engine
+from app.core.database import Base, SessionLocal, engine
+from app.core.security import hash_password
+from app.models.models import Profile, User, UserRole
+
 
 tags_metadata = [
     {
@@ -57,6 +61,41 @@ def health_check():
 @app.get("/ready", tags=["Health"])
 def readiness_check():
     return {"status": "ready"}
+
+ 
+Base.metadata.create_all(bind=engine)
+
+db = SessionLocal()
+
+email = "admin@example.com"
+
+existing_admin = db.query(User).filter(User.email == email).first()
+
+if existing_admin:
+    print("Admin already exists")
+else:
+    admin = User(
+        email=email,
+        phone="9876543212",
+        password_hash=hash_password("Password123"),
+        role=UserRole.ADMIN,
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    profile = Profile(
+        user_id=admin.id,
+        full_name="System Admin",
+    )
+
+    db.add(profile)
+    db.commit()
+
+    print("Admin created successfully")
+
+db.close()
 
 
 app.include_router(auth.router)
