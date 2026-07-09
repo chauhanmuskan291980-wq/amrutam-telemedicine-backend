@@ -6,7 +6,8 @@ sqlalchemy
 alembic
 psycopg2-binary
 python-dotenv
-passlib[bcrypt]
+passlib[bcrypt==4.0.1]
+bcrypt==4.0.1
 python-jose[cryptography]
 redis
 pytest
@@ -16,3 +17,4 @@ ruff
 bandit
 pip-audit
 prometheus-fastapi-instrumentator
+email-validator
