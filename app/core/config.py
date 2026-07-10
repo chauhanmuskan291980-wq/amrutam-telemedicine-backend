@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
 
     rate_limit_storage_url: str = "memory://"
+    rate_limit_enabled: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

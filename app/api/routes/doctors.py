@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status , Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -16,10 +16,10 @@ router = APIRouter(prefix="/doctors", tags=["Doctors"])
 
 @router.get("", response_model=list[DoctorResponse])
 def search_doctors(
-    specialization: str | None = None,
-    min_rating: float | None = None,
-    limit: int = 20,
-    offset: int = 0,
+    specialization: str | None = Query(default=None, max_length=100),
+    min_rating: float | None = Query(default=None, ge=0, le=5),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     query = db.query(Doctor)

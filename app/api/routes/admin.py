@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends , Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -25,8 +25,8 @@ def analytics_summary(
 
 @router.get("/audit-logs")
 def get_audit_logs(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
 ):
