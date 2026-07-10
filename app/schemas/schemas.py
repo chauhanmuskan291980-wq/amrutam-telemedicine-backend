@@ -1,8 +1,9 @@
+import re
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.models.models import ConsultationStatus, PaymentStatus, SlotStatus, UserRole
 
@@ -11,16 +12,56 @@ class UserRegisterRequest(BaseModel):
     email: EmailStr
     phone: str | None = None
     password: str = Field(min_length=8, max_length=72)
-    full_name: str
+    full_name: str = Field(min_length=2,max_length=255)
     role: UserRole = UserRole.PATIENT
     specialization: str | None = None
-    experience_years: int | None = 0
-    consultation_fee: Decimal | None = 0
+    experience_years: int | None = Field(default=0, ge=0, le=60)
+    consultation_fee: Decimal | None = Field(default=0, ge=0, le=100000)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls , value:str) -> str:
+        if not re.search(r"[A-Za-z]",value):
+            raise ValueError("Password must contain at least one letter")
+        
+
+        if not re.search(r"\d",value):
+            raise ValueError("Password must contain at least one number")
+        
+        return value
+    
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls , value:str|None)-> str|None:
+        if value is None:
+            return value
+        
+        if not re.fullmatch(r"[6-9\d{9}]",value):
+            raise ValueError("Phone number must be a valid 10-digit Indian mobile number")
+        
+        return value
+    
+
+    @model_validator(mode="after")
+    def validate_doctor_fields(self):
+        if self.role == UserRole.DOCTOR:
+            if not self.specialization:
+             raise ValueError("Specialization is required for doctor registration")
+            
+            if len(self.specialization.strip())<2:
+                raise ValueError("Specialization must be at least 2 characters")
+
+        return self
+    
+
+
+
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str =Field(min_length=8 , max_length=72)
 
 
 class TokenResponse(BaseModel):
@@ -54,6 +95,26 @@ class AvailabilityCreateRequest(BaseModel):
     start_time: datetime
     end_time: datetime
 
+    @model_validator(mode='after')
+    def validate_slot_time(self):
+        now = datetime.utcnow()
+
+        if self.start_time <=now:
+            raise ValueError("Slot start time must be in the future")
+        
+        if self.end_time <= self.start_time:
+            raise ValueError("Slot end time must be greater than start time")
+        
+        duration_minutes = (self.end_time - self.start_time).total_seconds /60
+
+        if duration_minutes < 15:
+            raise ValueError("Slot duration must be at least 15 minutes")
+
+        if duration_minutes > 120:
+            raise ValueError("Slot duration cannot be more than 120 minutes")
+
+        return self
+
 
 class AvailabilityResponse(BaseModel):
     id: int
@@ -67,7 +128,7 @@ class AvailabilityResponse(BaseModel):
 
 class BookingRequest(BaseModel):
     slot_id: int
-    reason: str | None = None
+    reason: str | None = Field(default=None , max_length=500)
 
 
 class ConsultationResponse(BaseModel):
@@ -81,9 +142,30 @@ class ConsultationResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+
 class PrescriptionCreateRequest(BaseModel):
-    medicines: list[dict[str, Any]]
-    notes: str | None = None
+    medicines: list[dict[str, Any]] = Field(min_length=1 , max_length=20)
+    notes: str | None = Field(default=None , max_length=2000)
+    
+    @field_validator("medicines")
+    @classmethod
+    def validate_medicines(cls , value:list[dict[str,Any]]) -> list[dict[str,Any]]:
+        required_fields = {"name":"dosage","frequency":"duration"}
+
+        for medicine in value:
+            missing_fields = required_fields - set(medicine.keys())
+
+            if missing_fields:
+                raise ValueError(
+                    f"Medicine is missing required fields: {', '.join(missing_fields)}"
+                )
+            
+            for field in required_fields:
+                if not str(medicine.get(field,"")).strip():
+                    raise ValueError(f"Medicine Field '{field}' cannot be empty")
+                
+
+        return value
 
 
 class PrescriptionResponse(BaseModel):
@@ -108,7 +190,7 @@ class PaymentResponse(BaseModel):
 
 
 class MockPaymentConfirmRequest(BaseModel):
-    payment_id: int
+    payment_id: int = Field(gt=0)
     status: PaymentStatus = PaymentStatus.PAID
 
 
