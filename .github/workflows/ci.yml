@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: Backend CI
 
 on:
   push:
@@ -7,8 +7,31 @@ on:
     branches: ["main"]
 
 jobs:
-  test-and-lint:
+  test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: amrutam_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/amrutam_db
+      JWT_SECRET_KEY: test-secret-key
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REDIS_URL: redis://localhost:6379/0
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
 
     steps:
       - name: Checkout code
@@ -17,21 +40,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run linting
+      - name: Run tests
         run: |
-          ruff check .
+          pytest -v
 
       - name: Run security scan
         run: |
           bandit -r app || true
-
-      - name: Run tests
-        run: |
-          pytest
