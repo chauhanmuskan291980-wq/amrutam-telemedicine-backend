@@ -11,6 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from app.core.rate_limiter import limiter
+from app.core.cache import redis_client
 
 tags_metadata = [
     {
@@ -81,6 +82,31 @@ def health_check():
 @app.get("/ready", tags=["Health"])
 def readiness_check():
     return {"status": "ready"}
+
+
+@app.get("/health/redis", tags=["Health"])
+def redis_health_check():
+    from app.core.config import settings
+    from app.core.cache import redis_client
+
+    if not settings.redis_enabled:
+        return {
+            "status": "redis disabled",
+            "mode": "in-memory cache",
+        }
+
+    try:
+        if redis_client:
+            redis_client.ping()
+            return {"status": "redis healthy"}
+
+        return {"status": "redis unavailable"}
+
+    except Exception as exc:
+        return {
+            "status": "redis unavailable",
+            "error": str(exc),
+        }
 
  
 Base.metadata.create_all(bind=engine)

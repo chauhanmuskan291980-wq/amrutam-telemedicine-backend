@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status , Query
 from sqlalchemy.orm import Session
-
+from app.core.cache import delete_cache_pattern, get_cache, set_cache
 from app.core.database import get_db
 from app.core.dependencies import require_roles
 from app.models.models import AvailabilitySlot, Doctor, SlotStatus, User, UserRole
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/doctors", tags=["Doctors"])
 
 
 @router.get("", response_model=list[DoctorResponse])
+@router.get("", response_model=list[DoctorResponse])
 def search_doctors(
     specialization: str | None = Query(default=None, max_length=100),
     min_rating: float | None = Query(default=None, ge=0, le=5),
@@ -22,6 +23,19 @@ def search_doctors(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
+    cache_key = (
+        f"doctor_search:"
+        f"specialization={specialization}:"
+        f"min_rating={min_rating}:"
+        f"limit={limit}:"
+        f"offset={offset}"
+    )
+
+    cached_result = get_cache(cache_key)
+
+    if cached_result is not None:
+        return cached_result
+
     query = db.query(Doctor)
 
     if specialization:
@@ -30,7 +44,24 @@ def search_doctors(
     if min_rating is not None:
         query = query.filter(Doctor.rating >= min_rating)
 
-    return query.offset(offset).limit(limit).all()
+    doctors = query.offset(offset).limit(limit).all()
+
+    result = [
+        {
+            "id": doctor.id,
+            "user_id": doctor.user_id,
+            "specialization": doctor.specialization,
+            "experience_years": doctor.experience_years,
+            "consultation_fee": doctor.consultation_fee,
+            "rating": doctor.rating,
+            "is_verified": doctor.is_verified,
+        }
+        for doctor in doctors
+    ]
+
+    set_cache(cache_key, result, ttl_seconds=60)
+
+    return result
 
 
 @router.post("/availability", response_model=AvailabilityResponse, status_code=status.HTTP_201_CREATED)
@@ -75,6 +106,8 @@ def create_availability(
 
     db.commit()
     db.refresh(slot)
+
+    delete_cache_pattern("doctor_search:*")
 
     return slot
 

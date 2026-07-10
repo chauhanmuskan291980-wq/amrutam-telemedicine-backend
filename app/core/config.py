@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     app_debug: bool = True
 
     database_url: str = "postgresql://postgres:postgres@localhost:5432/amrutam_db"
-    redis_url: str = "redis://localhost:6379/0"
+    redis_enabled: bool = False
+    redis_url: str = "redis://127.0.0.1:6379/0"
+     
 
     jwt_secret_key: str = "change-this-secret-key"
     jwt_algorithm: str = "HS256"
