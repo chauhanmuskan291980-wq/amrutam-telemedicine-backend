@@ -33,14 +33,14 @@ class UserRegisterRequest(BaseModel):
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls , value:str|None)-> str|None:
-        if value is None:
-            return value
-        
-        if not re.fullmatch(r"[6-9\d{9}]",value):
-            raise ValueError("Phone number must be a valid 10-digit Indian mobile number")
-        
+    def validate_phone(cls, value: str | None) -> str | None:
+     if value is None:
         return value
+
+     if not re.fullmatch(r"^[6-9][0-9]{9}$", value):
+        raise ValueError("Phone number must be a valid 10-digit Indian mobile number")
+
+     return value
     
 
     @model_validator(mode="after")
@@ -95,17 +95,17 @@ class AvailabilityCreateRequest(BaseModel):
     start_time: datetime
     end_time: datetime
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_slot_time(self):
         now = datetime.utcnow()
 
-        if self.start_time <=now:
+        if self.start_time <= now:
             raise ValueError("Slot start time must be in the future")
-        
+
         if self.end_time <= self.start_time:
             raise ValueError("Slot end time must be greater than start time")
-        
-        duration_minutes = (self.end_time - self.start_time).total_seconds /60
+
+        duration_minutes = (self.end_time - self.start_time).total_seconds() / 60
 
         if duration_minutes < 15:
             raise ValueError("Slot duration must be at least 15 minutes")
@@ -127,8 +127,8 @@ class AvailabilityResponse(BaseModel):
 
 
 class BookingRequest(BaseModel):
-    slot_id: int
-    reason: str | None = Field(default=None , max_length=500)
+    slot_id: int = Field(gt=0)
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class ConsultationResponse(BaseModel):
@@ -144,13 +144,13 @@ class ConsultationResponse(BaseModel):
 
 
 class PrescriptionCreateRequest(BaseModel):
-    medicines: list[dict[str, Any]] = Field(min_length=1 , max_length=20)
-    notes: str | None = Field(default=None , max_length=2000)
-    
+    medicines: list[dict[str, Any]] = Field(min_length=1, max_length=20)
+    notes: str | None = Field(default=None, max_length=2000)
+
     @field_validator("medicines")
     @classmethod
-    def validate_medicines(cls , value:list[dict[str,Any]]) -> list[dict[str,Any]]:
-        required_fields = {"name":"dosage","frequency":"duration"}
+    def validate_medicines(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        required_fields = {"name", "dosage", "frequency", "duration"}
 
         for medicine in value:
             missing_fields = required_fields - set(medicine.keys())
@@ -159,11 +159,10 @@ class PrescriptionCreateRequest(BaseModel):
                 raise ValueError(
                     f"Medicine is missing required fields: {', '.join(missing_fields)}"
                 )
-            
+
             for field in required_fields:
-                if not str(medicine.get(field,"")).strip():
-                    raise ValueError(f"Medicine Field '{field}' cannot be empty")
-                
+                if not str(medicine.get(field, "")).strip():
+                    raise ValueError(f"Medicine field '{field}' cannot be empty")
 
         return value
 
