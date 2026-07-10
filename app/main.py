@@ -7,6 +7,10 @@ from app.core.database import Base, SessionLocal, engine
 from app.core.security import hash_password
 from app.models.models import Profile, User, UserRole
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from app.core.rate_limiter import limiter
 
 tags_metadata = [
     {
@@ -41,6 +45,10 @@ app = FastAPI(
     openapi_url="/openapi.json",
     openapi_tags=tags_metadata,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 

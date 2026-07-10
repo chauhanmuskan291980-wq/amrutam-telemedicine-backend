@@ -7,11 +7,13 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.models.models import Doctor, Profile, User, UserRole
 from app.schemas.schemas import LoginRequest, TokenResponse, UserRegisterRequest, UserResponse
 from app.utils.audit import create_audit_log
+from app.core.rate_limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 def register_user(
     payload: UserRegisterRequest,
     request: Request,
@@ -78,6 +80,7 @@ def register_user(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 def login_user(
     payload: LoginRequest,
     request: Request,

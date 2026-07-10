@@ -26,11 +26,13 @@ from app.schemas.schemas import (
     PrescriptionResponse,
 )
 from app.utils.audit import create_audit_log
+from app.core.rate_limiter import limiter
 
 router = APIRouter(prefix="/consultations", tags=["Consultations"])
 
 
 @router.post("/book", response_model=ConsultationResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 def book_consultation(
     payload: BookingRequest,
     request: Request,

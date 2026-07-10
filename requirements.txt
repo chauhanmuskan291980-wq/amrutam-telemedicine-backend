@@ -18,3 +18,4 @@ bandit
 pip-audit
 prometheus-fastapi-instrumentator
 email-validator
+slowapi
