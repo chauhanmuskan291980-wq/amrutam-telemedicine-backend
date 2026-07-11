@@ -6,6 +6,14 @@ from typing import Any
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.models.models import ConsultationStatus, PaymentStatus, SlotStatus, UserRole
+from datetime import datetime, timezone
+
+
+
+def make_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 class UserRegisterRequest(BaseModel):
@@ -97,24 +105,26 @@ class AvailabilityCreateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_slot_time(self):
+        self.start_time = make_utc_naive(self.start_time)
+        self.end_time = make_utc_naive(self.end_time)
+
         now = datetime.utcnow()
 
         if self.start_time <= now:
-            raise ValueError("Slot start time must be in the future")
+            raise ValueError("Start time must be in the future")
 
         if self.end_time <= self.start_time:
-            raise ValueError("Slot end time must be greater than start time")
+            raise ValueError("End time must be after start time")
 
         duration_minutes = (self.end_time - self.start_time).total_seconds() / 60
 
         if duration_minutes < 15:
-            raise ValueError("Slot duration must be at least 15 minutes")
+            raise ValueError("Availability slot must be at least 15 minutes")
 
         if duration_minutes > 120:
-            raise ValueError("Slot duration cannot be more than 120 minutes")
+            raise ValueError("Availability slot cannot be more than 120 minutes")
 
         return self
-
 
 class AvailabilityResponse(BaseModel):
     id: int
