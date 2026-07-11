@@ -1,17 +1,18 @@
 from fastapi import FastAPI
-from prometheus_fastapi_instrumentator import Instrumentator
-
-from app.api.routes import admin, auth, consultations, doctors, payments
-from app.core.database import Base, engine
-from app.core.database import Base, SessionLocal, engine
-from app.core.security import hash_password
-from app.models.models import Profile, User, UserRole
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi import _rate_limit_exceeded_handler
+
+from app.api.routes import admin as admin_routes
+from app.api.routes import auth as auth_routes
+from app.api.routes import consultations as consultation_routes
+from app.api.routes import doctors as doctor_routes
+from app.api.routes import payments as payment_routes
+from app.core.database import Base, engine
 from app.core.rate_limiter import limiter
-from app.core.cache import redis_client
+
 
 tags_metadata = [
     {
@@ -34,6 +35,10 @@ tags_metadata = [
         "name": "Admin",
         "description": "Admin analytics and audit logs",
     },
+    {
+        "name": "Health",
+        "description": "Health, readiness, Redis, and metrics checks",
+    },
 ]
 
 
@@ -51,8 +56,6 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -63,6 +66,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.on_event("startup")
 def on_startup():
@@ -86,8 +90,8 @@ def readiness_check():
 
 @app.get("/health/redis", tags=["Health"])
 def redis_health_check():
-    from app.core.config import settings
     from app.core.cache import redis_client
+    from app.core.config import settings
 
     if not settings.redis_enabled:
         return {
@@ -108,46 +112,11 @@ def redis_health_check():
             "error": str(exc),
         }
 
- 
-Base.metadata.create_all(bind=engine)
 
-db = SessionLocal()
-
-email = "admin@example.com"
-
-existing_admin = db.query(User).filter(User.email == email).first()
-
-if existing_admin:
-    print("Admin already exists")
-else:
-    admin = User(
-        email=email,
-        phone="9876543212",
-        password_hash=hash_password("Password123"),
-        role=UserRole.ADMIN,
-        is_active=True,
-    )
-
-    db.add(admin)
-    db.flush()
-
-    profile = Profile(
-        user_id=admin.id,
-        full_name="System Admin",
-    )
-
-    db.add(profile)
-    db.commit()
-
-    print("Admin created successfully")
-
-db.close()
-
-
-app.include_router(auth.router)
-app.include_router(doctors.router)
-app.include_router(consultations.router)
-app.include_router(payments.router)
-app.include_router(admin.router)
+app.include_router(auth_routes.router)
+app.include_router(doctor_routes.router)
+app.include_router(consultation_routes.router)
+app.include_router(payment_routes.router)
+app.include_router(admin_routes.router)
 
 Instrumentator().instrument(app).expose(app)

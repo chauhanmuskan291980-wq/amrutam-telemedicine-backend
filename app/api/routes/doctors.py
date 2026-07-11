@@ -14,7 +14,7 @@ from app.utils.audit import create_audit_log
 router = APIRouter(prefix="/doctors", tags=["Doctors"])
 
 
-@router.get("", response_model=list[DoctorResponse])
+
 @router.get("", response_model=list[DoctorResponse])
 def search_doctors(
     specialization: str | None = Query(default=None, max_length=100),

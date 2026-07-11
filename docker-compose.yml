@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:16
+    container_name: amrutam_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: amrutam_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - amrutam_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d amrutam_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: amrutam_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: amrutam_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: Amrutam Telemedicine Backend
+      APP_ENV: docker
+      APP_DEBUG: "false"
+
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/amrutam_db
+
+      REDIS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_STORAGE_URL: redis://redis:6379/1
+
+      JWT_SECRET_KEY: change-this-docker-secret-key
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: amrutam_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - app
+
+volumes:
+  amrutam_postgres_data:
