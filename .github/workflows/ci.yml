@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test-and-security:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: amrutam_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d amrutam_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      APP_NAME: Amrutam Telemedicine Backend
+      APP_ENV: test
+      APP_DEBUG: "false"
+
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/amrutam_db
+
+      REDIS_ENABLED: "false"
+      REDIS_URL: redis://127.0.0.1:6379/0
+
+      RATE_LIMIT_ENABLED: "false"
+      RATE_LIMIT_STORAGE_URL: memory://
+
+      JWT_SECRET_KEY: test-secret-key-for-ci
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest -v
+
+      - name: Run Ruff lint check
+        run: |
+          ruff check app tests
+
+      - name: Run Bandit security scan
+        run: |
+          bandit -r app -x app/seed_admin.py
